@@ -1,0 +1,178 @@
+---
+title: "CS 422 Section 01"
+author: "Rohit Madhukar Lakde"
+date: "Feb 16, 2019"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+---
+
+### Part 2.1-A
+```{r}
+setwd("C:\\Users\\rohit\\Documents")
+as.data.frame(read.csv("College.csv",stringsAsFactors = FALSE)) -> college.df
+head(college.df)
+
+```
+
+### Part 2.1-B
+```{r}
+paste0("Number of Private Colleges are ", table(college.df$Private == "Yes")[2], " And number of public colleges are ", table(college.df$Private == "Yes")[1])
+
+```
+
+### Part 2.1-C
+```{r}
+library(dplyr)
+PrivateColleges <- college.df %>% filter(Private == "Yes")
+PublicColleges <- college.df %>% filter(Private == "No")
+PrivColPHD <- PrivateColleges$PhD
+PubColPHD <- PublicColleges$PhD
+hist(PrivColPHD,main = "Private colleges are top-heavy with respect to PhD faculty", xlab="Number of phd students in private college",ylab="Number of private colleges", col = "Green", freq = FALSE)
+lines(density(PrivColPHD),col = "Red")
+hist(PubColPHD, xlab="Number of phd students in public college",ylab="Number of public college",col = "Green", freq = FALSE)
+lines(density(PubColPHD),col = "Red")
+paste0("Private colleges are top-heavy with respect to PhD faculty")
+
+```
+
+### Part 2.1-d
+```{r}
+library(dplyr)
+MinGradeCOllege <- as.data.frame(arrange(college.df,Grad.Rate))
+MinGradRateColl<-select(MinGradeCOllege, contains("name"), contains("Grad.Rate"))
+paste0("Top 6 colleges with lowest graduation rate")
+head(MinGradRateColl,5)
+MaxGradeCOllege <- as.data.frame(arrange(college.df,desc(Grad.Rate)))
+MaxGradRateColl<-select(MaxGradeCOllege, contains("name"), contains("Grad.Rate"))
+paste0("Top 6 colleges with maximum graduation rate")
+head(MaxGradRateColl,5)
+
+```
+
+### Part 2.1-e(1)
+```{r}
+summary(college.df)
+
+```
+
+### Part 2.1-e(2)
+```{r}
+pairs(college.df[3:12],main = "Scatterplot for first 10 numerical columns in data frame")
+
+```
+
+### Part 2.1-e(3)
+```{r}
+boxplot(college.df$perc.alumni~college.df$Private,xlab="Is it a private college?",ylab="Percent of alumni who donate",main="Boxplot for university type vs Percent of alumni who donate")
+paste0("Alumni who go to private schools donate more to their colleges")
+
+```
+
+### Part 2.1-e(4)
+```{r}
+boxplot(college.df$PhD~college.df$Private,xlab="Is it a private college?",ylab="Number of PhD students",main="Boxplot for university type vs Number of PhD students")
+paste0("Public colleges employ more PhD's")
+
+```
+
+### Part 2.1-e(5)
+```{r}
+NewColDf <- college.df
+Elite <- 1:nrow(NewColDf)
+Elite[1:nrow(NewColDf)] <- "No"
+Elite[NewColDf$Top10perc > 50] <- "Yes"
+NewColDf <- data.frame(NewColDf, Elite)
+EliteColleges <- NewColDf %>% filter(Elite == "Yes")
+summary(EliteColleges)
+paste0("Number of Elite universities are")
+nrow(EliteColleges)
+```
+
+### Part 2.1-e(6)
+```{r}
+par(mfrow=c(2,2))
+hist(college.df$Apps)
+hist(college.df$Accept,breaks = 7)
+hist(college.df$Enroll,breaks = 14)
+```
+
+### Part 2.1-e(7)
+```{r}
+paste0("Tried and performed below operations on given dataset")
+DfAsMatrix<-data.matrix(college.df)
+m <- matrix(DfAsMatrix, nrow = 6, ncol = 10)
+t(DfAsMatrix[ 1,])
+collInfo <- college.df %>% filter(Name == "Adrian College")
+select(collInfo, contains("name"), contains("Grad.Rate"))
+arrange(college.df,desc(Name))
+
+```
+
+### Part 2.2-a
+```{r}
+library(ISLR)
+data('Auto')
+SimpRegreAuto = lm(mpg~horsepower,Auto)
+summary(SimpRegreAuto)
+paste0("8-a-1 Yes there is a kind of strong relationship between mpg and horsepower as R square value is 0.6059")
+paste0("8-a-2 As the value of coefficient of determination is 0.6059 so it shows 60% of the response variable is due to predictor")
+paste0("8-a-3 As the coefficient value is -0.157845, the relationship between response and predictor is negative")
+paste0("Predicted value of mpg along with associated 95% confidence and presiction interval are")
+predict(SimpRegreAuto,data.frame("horsepower"=98),interval = "confidence", level = 0.95)
+predict(SimpRegreAuto,data.frame("horsepower"=98),interval = "prediction", level = 0.95)
+
+```
+
+### Part 2.2-b
+```{r}
+data('Auto')
+VarMpg <- Auto$mpg
+VarHorse <- Auto$horsepower
+plot(VarHorse,VarMpg, main = "Mpg vs Horsepower")
+abline(SimpRegreAuto, col="Blue")
+
+```
+### Part 2.2-c
+```{r}
+plot(SimpRegreAuto)
+cat(paste0('Below are the problems with the fit:','\n',' 1. There are points which are present far away from the line which shows outliers are present in scale location graphs','\n', ' 2. Points 94 and 117 seems to be odd like big leverages in Residuals vs Leverage graph','\n', ' 3. Relationship between response and predictor is not linear'))
+
+```
+
+### Part 2.3-a
+```{r}
+pairs(Auto[1:8],main = "Scatterplot for first 8 columns in Auto data set")
+
+```
+
+### Part 2.3-b
+```{r}
+cor(Auto[1:8])
+
+```
+### Part 2.3-c
+```{r}
+VarMultRegr <- lm(mpg ~ cylinders + displacement + horsepower + weight + acceleration + year + origin, Auto)
+summary(VarMultRegr)
+paste0("2.3-c-1 Yes According to summary data we can say there is relation between predictors and response")
+paste0("2.3-c-2 Looking at the coefficients we can say coumns Origin and Year seems to have more significant relation with response")
+paste0("2.3-c-3 Looking at the coefficients of year we can say columns mpg and year are related with the coefficient of 0.75 that is for a year mpg of 75.07 is possible")
+
+```
+### Part 2.3-d
+```{r}
+plot(VarMultRegr)
+cat(paste0('Below are the problems with the fit:', '\n' ,' 1. Relation between response and predictor is not linear', '\n',' 2. Yes looking at Residuals graph we can say there are outliers present like 323 and 327','\n', ' 3. Point 14 seens to be odd in leverage graph which is present at far distance from other points' ))
+
+```
+
+
+
+
+

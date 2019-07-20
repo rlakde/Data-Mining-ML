@@ -1,0 +1,203 @@
+---
+title: "CS 422 Section 01"
+author: "Rohit Lakde"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+---
+
+## 2.1 Decision tree classification
+### Part 2.1 A
+```{r}
+library(arules)
+library(caret)
+library(rpart.plot)
+library(ROCR)
+setwd("/Users/rohit/Documents/")
+options("digits"=3)
+set.seed(1122)
+AdultTrain <- read.csv('adult-train.csv',sep=",")
+#dim(AdultTrain)
+#sum(AdultTrain$occupation == "?")
+VectQnsMarkRec2 <- c(which(AdultTrain$native_country == "?"))
+AdultTrain <- AdultTrain[-VectQnsMarkRec2,]
+VectQnsMarkRec1 <- c(which(AdultTrain$workclass == "?"))
+AdultTrain <- AdultTrain[-VectQnsMarkRec1,]
+VectQnsMarkRec <- c(which(AdultTrain$occupation == "?"))
+AdultTrain <- AdultTrain[-VectQnsMarkRec,]
+AdultTrain
+
+AdultTest <- read.csv('adult-test.csv',sep=",")
+VectQnsMarkRec2Test <- c(which(AdultTest$native_country == "?"))
+AdultTest <- AdultTest[-VectQnsMarkRec2Test,]
+VectQnsMarkRecTest23 <- c(which(AdultTest$workclass == "?"))
+AdultTest <- AdultTest[-VectQnsMarkRecTest23,]
+VectQnsMarkRec22Test <- c(which(AdultTest$occupation == "?"))
+AdultTest <- AdultTest[-VectQnsMarkRec22Test,]
+AdultTest
+
+```
+  
+
+```{r}
+library(rpart)
+library(rpart.plot)
+rpresult <- rpart(income~.,data=AdultTrain,method="class")
+#summary(rpresult)
+rpart.plot(rpresult,type=4)
+```
+### Part 2.1 B
+####2.1-b-1 
+#####Looking at the Variable importance value top 3 predictors are Relationship, marital_status, Capital_gain
+
+####2.1-b-2 
+#####First split is done on Relationship predictor, Predicted class for node 1 is '<=50K' as more than 50% of the records falls in this category. Record distrubution at root node is 54% & 46%
+
+```{r}
+PredData <- predict(rpresult, AdultTest, type="class")
+
+confusionMatrix(PredData, as.factor(AdultTest$income))
+
+```
+### Part 2.1 C
+####2.1-c-1 
+#####Balance accuracy of our model is 0.727
+
+####2.1-c-2 
+#####Balance error rate of our model is 0.273
+
+####2.1-c-3 
+#####Sensitivity is 0.948 and Specificity is 0.506
+
+```{r}
+PredDataProb <- predict(rpresult, AdultTest, type="prob")[,2]
+Predf <- prediction(PredDataProb, AdultTest$income)
+Perff <- performance(Predf, "tpr", "fpr")
+plot(Perff)
+abline(0,1)
+auc <- performance(Predf, measure = "auc")
+cat(paste("The area under curve (AUC) for this model is ", round(auc@y.values[[1]], 3)))
+
+```
+####2.1-c-4 
+#####Area under the curve is 0.843
+
+```{r}
+printcp(rpresult)
+```
+###2.1-d 
+#####If we have a look at xerror column in above complexity table then we understand that xerror is value is decreasing till end(If it increases after some value then we prune at that node) so there is no need to prune the decision tree
+
+```{r}
+paste0("Number of training records which are less than or equals to 50K are ",sum(AdultTrain$income == "<=50K"))
+paste0("Number of training records which are greater than 50K are ",sum(AdultTrain$income == ">50K"))
+
+```
+###2.1-e
+####2.1-e-1
+##### There are 22653 records less than or eqauls to 50k & 7508 records greater than 50K
+
+####2.1-e-2
+```{r}
+library(dplyr)
+sample1= AdultTrain%>%filter(income == "<=50K")
+sample2 <- sample1[sample(nrow(sample1), sum(AdultTrain$income == ">50K"), replace = FALSE, prob = NULL),]
+sample3= AdultTrain%>%filter(income == ">50K")
+FinalTrain = rbind(sample2,sample3)
+FinalTrain <- FinalTrain[sample(nrow(FinalTrain)),]
+FinalTrain
+
+```
+
+####2.1-e-3
+```{r}
+Finalrpresult <- rpart(income~.,data=FinalTrain,method="class")
+#summary(rpresult)
+rpart.plot(Finalrpresult,type=4)
+FinalPredData <- predict(Finalrpresult, AdultTest, type="class")
+confusionMatrix(FinalPredData, as.factor(AdultTest$income))
+
+```
+####2.1-e-3 
+#####2.1-e-3-1
+######Balanced accuracy of our model is 0.809 
+
+#####2.1-e-3-2
+######Balanced error rate of our model is 0.191 
+
+#####2.1-e-3-3
+######Value of sensitivity is 0.782 and value of specificity is 0.835
+
+#####2.1-e-3-4
+######Area under the curve is 0.846
+```{r}
+FinalPredDataProb <- predict(Finalrpresult, AdultTest, type="prob")[,2]
+FinalPredf <- prediction(FinalPredDataProb, AdultTest$income)
+FinalPerff <- performance(FinalPredf, "tpr", "fpr")
+plot(FinalPerff)
+abline(0,1)
+auc <- performance(FinalPredf, measure = "auc")
+cat(paste("The area under curve (AUC) for this model is ", round(auc@y.values[[1]], 3)))
+
+```
+###2.1-e
+####Balanced accuracy for old and new models is 0.727, 0.809. Balanced error rate for old and new models is 0.273, 0.191. Sensitivity for old and new models is 0.948, 0.782. Specificity for old and new models is 0.506, 0.835. Area under the curve for old and new models is 0.843, 0.845 respectively. From this we can conclude that tendency of model to predicts moves towards the class in which more records are presents so taking equal number of records in each class is good practice.
+  
+## 2.2 Association Analysis
+### Part 2.2 B
+```{r}
+library(arules)
+setwd("/Users/rohit/Documents/Assignment2/")
+TransData1K <- read.transactions('tr-1k-canonical.csv',sep=",")
+fitems <-apriori(TransData1K,parameter = list(support=0.01,target='frequent itemsets'))
+summary(fitems)                                     
+inspect(sort(fitems, by='support', decreasing = T)[1:5])                    
+rules <- apriori(TransData1K,parameter = list(support=0.01,confidence=.5,minlen=2,target='rules'))
+inspect(sort(rules, by='lift', decreasing = T)[1:5])                  
+
+```
+
+
+### Part 2.2 C
+```{r}
+setwd("/Users/rohit/Documents/Assignment2/")
+TransData5K <- read.transactions('tr-5k-canonical.csv',sep=",")
+TransData20K <- read.transactions('tr-20k-canonical.csv',sep=",")
+TransData75K <- read.transactions('tr-75k-canonical.csv',sep=",")
+rules5 <- apriori(TransData5K, parameter = list(support=0.01))
+rules20 <- apriori(TransData20K, parameter = list(support=0.01))
+rules75 <- apriori(TransData75K, parameter = list(support=0.01))
+inspect(head(rules5, by="confidence"))
+inspect(head(rules20, by="confidence"))
+inspect(head(rules75, by="confidence"))  
+
+```
+#### Selected different minsupport values and came to know that if we set it low then we get information overload means there too many itemsets and too many spurious rules
+### Part 2.2 D
+```{r}
+library(arulesViz)
+itemsets75K <- apriori(TransData75K,parameter = list(support=.001,minlen=2,target='frequent' ))
+summary(itemsets75K)
+par(mfrow=c(1,2))
+
+itemFrequencyPlot(TransData75K,
+                  type="relative",
+                  topN=3, 
+                  main='Frequently bought items')
+
+barplot(sort(table(unlist(LIST(TransData75K))))[1:10]/100,
+        xlab='',
+        main='Least frequently bought')
+#inspect(sort(itemsets75K, by='support', decreasing = T)[1:5])
+
+```
+#### Most frequently bought item is cofeee Eclair & least frequently bought item is Chocolate Meringue
+
+
+
+

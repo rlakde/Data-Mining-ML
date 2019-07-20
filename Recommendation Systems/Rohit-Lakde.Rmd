@@ -1,0 +1,475 @@
+---
+title: "CS 422 Section 01"
+author: "Rohit Madhukar Lakde"
+date: "May 04, 2019"
+output:
+  html_notebook:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+---
+
+### Part 2.1 LSH
+```{r}
+setwd("/Users/rohit/Documents/")
+library(textreuse)
+rm(list=ls())
+```
+##### Part 2.1 A How many shingles (or tokens) are there in all of the 100 documents?
+```{r}
+minhash <- minhash_generator(n=240, seed=100)
+files <- list.files("corpus", full.names=T)
+corpus <- TextReuseCorpus(files, tokenizer = tokenize_ngrams, n = 5,minhash_func = minhash,
+                          keep_tokens = TRUE)
+col <- length(corpus)
+rows <- c()
+for(docno in 1:col){
+  NoOfShingles <- hashes(corpus[docno])[[1]]
+  rows <- union(rows, NoOfShingles) 
+}
+rowcnt <- length(unique(unlist(rows),use.names = TRUE))
+sprintf("Number of shingles are %d",rowcnt)
+```
+
+##### Part 2.1 B  What are the dimensions of the characteristic matrix?
+```{r}
+col <- length(corpus)
+rows <- c()
+for(docno in 1:col){
+  NoOfShingles <- hashes(corpus[docno])[[1]]
+  rows <- union(rows, NoOfShingles) 
+}
+rowcnt <- length(unique(unlist(rows),use.names = TRUE ))
+sprintf("Columns are %d , and Rows are %d",col,  rowcnt)
+```
+##### Part 2.1 C  Print the first 5 shingles (or tokens) of the file orig_taske.txt. 
+```{r}
+d <- corpus[["orig_taske"]]
+print("First 5 shingles of file orig_taske are ")
+head(d$tokens, 5)
+```
+##### Part 2.1 D We will fix our signatures (or hashes, or the rows in the signature matrix) at 240.  This represents what percentage reduction in the size of the problem?  
+> We are reducing size to 240 so percente reduction is 98.64
+
+##### Part 2.1 E  At 240 signatures (or hashes), how many bands would we need to detect a minimum Jaccard similarity of 0.23?  
+```{r}
+lsh_threshold(h=240,b=40)
+lsh_threshold(h=240,b=60)
+lsh_threshold(h=240,b=80)
+```
+> As per above analysis if we select 80 bands and 240 signatures then we detect a Jaccard similarity of 0.23
+
+##### Part 2.1 F Using the number of bands you determined in (e), what is our probability of catching similar documents at a minimum Jaccard similarity of 0.23?  
+```{r}
+print("Probability of catching similar documents is ")
+lsh_probability(h=240,b=80,s=0.23)
+```
+##### Part 2.1_g_1  How many comparisons were made when we used the characteristic matrix?   
+```{r}
+pairs <- pairwise_candidates(pairwise_compare(corpus, jaccard_similarity, progress=interactive()))
+```
+> Its making around 4950 comparisons
+
+##### Part 2.1_g_2  Examine the object returned by pairwise_candidate().  The object returned is called a tibble.  Tibbles are data frames except that they are invariant, i.e., once created, they do not change.  From this object, how many documents have a Jaccard similarity score of at least 0.23? ?   
+```{r}
+print("No of documents having a similarity score of at least 0.23 is : ")
+nrow(pairs[pairs$score*10 > 0.23,])
+```
+##### Part 2.1_g_3 List all the rows in the tibble that contain a Jaccard similarity of at least 0.23, sorted in decreasing order by the score
+```{r}
+abc<-pairs[pairs$score*10 > .23,]
+sort1.abc <- abc[order(-abc$score) , ]
+sort1.abc
+```
+##### Part 2.1_h_1 While running LSH on the corpus, how many comparisons were made?  
+```{r}
+buckets <- lsh(corpus,bands = 80,progress = FALSE)
+candidates <- lsh_candidates(buckets)
+res <- lsh_compare(candidates, corpus, jaccard_similarity)
+```
+> It is making only 26 comparisons
+
+##### Part 2.1_h While running LSH on the corpus, how many comparisons were made?  
+```{r}
+candidates <- lsh_candidates(buckets)
+candidates
+```
+> There are 26 candidate pairs
+> 26 comparisons were made for LSH
+
+##### Part 2.1_h_2
+> There are 4950 comparisons in pairwise candidate and for LSH it is 26 so there is approximately 99.48% reduction in computation 
+
+##### Part 2.1_h_3
+```{r}
+res.sorted <- res[order(-res$score),]
+res.sorted
+```
+> There are 26 rows in table
+
+##### Part 2.1_h_4
+```{r}
+print("No of documents having a similarity score of at least 0.23 is : ")
+nrow(res[res$score*10 > 0.23,])
+```
+> All 26 have similarity index greater than or equal to 0.23
+
+##### Part 2.1_h_5
+```{r}
+res.sorted <- res[order(-res$score),]
+res.sorted
+```
+##### Part 2.1_h_6
+> If we compare output of g3 there were 177 rows having similarity index of at least 0.23 with the help of LSH technique we are minimizing it to only 26, If we have a look at given documents then we will find that results obtained by LHS is correct, As we are forming signature matrix on the basis of characteristics matrics that means we are reducing the number of rows which means overall processing is also improved
+
+### Part 2.2 Content Based Recommendation Systems
+
+####Loading movies csv file and select random 10 movies
+```{r}
+mvs <- read.csv("ml-latest-small/movies.csv", header=T, sep=",")
+#randommv <- sample(1:nrow(mvs), 10)
+#sample10mv <- mvs[randommv, ]
+#sample10mv
+```
+
+####Loading movies csv file and select random 10 movies
+```{r}
+IITID = 20434998
+userid = IITID %% 671
+sprintf("User ID is %d", userid)
+```
+#### Create user profile
+
+```{r}
+options(digits=3)
+mv_dt <- read.csv("ml-latest-small/movies.csv",header = TRUE,sep = ",")
+us_dt <- read.csv("ml-latest-small/ratings.csv",header = TRUE,sep = ",")
+mv_dt <- data.frame(lapply(mv_dt, as.character),stringsAsFactors = FALSE)
+uS_dt <- data.frame(lapply(us_dt,as.character),stringsAsFactors = FALSE)
+
+us364 <- subset(us_dt,us_dt$userId==364)
+genres <- c("Movie id","Action","Adventure","Animation","Children","Comedy","Crime","Documentary","Drama","Fantasy","Film-Noir","Horror","IMAX","Musical","Mystery","Romance","Sci-Fi","Thriller","War","Western","No Genres unlisted")
+mat1 <- matrix(as.numeric(0),nrow = 37,ncol = 21)
+colnames(mat1) <- factor(genres)
+movlist <- mv_dt[which(mv_dt$movieId %in% us364$movieId),]
+rownames(movlist) <- 1:36
+
+
+for (i in 1:36){
+  
+    mat1[i,1] <- movlist[i,1]
+    idx <- unlist(strsplit(movlist[i,]$genres,split="[|]"))#string splitting
+    for (k in 1:length(idx)){
+      mat1[i,idx[k]] <- as.numeric(1)
+    }
+}
+
+write.csv(mat1,file = "ml-latest-small/userprofile.csv",sep = ",")
+userprof <- read.csv("ml-latest-small/userprofile.csv",sep = ",",stringsAsFactors = FALSE)
+
+mat1[37,1] <- "AVG"
+for (t in 3:22){
+
+  mat1[37,t-1] <- mean(userprof[1:36,t])
+}
+uspf <- mat1[37,2:21] #single ve
+uspf
+```
+
+###create movie profile
+```{r}
+indc <- sample(1:9126,10,replace = FALSE) 
+random.movies <- mv_dt[indc,]
+rownames(random.movies) <- 1:10
+content.movies <- matrix(as.numeric(0),nrow = 10,ncol = 21)
+colnames(content.movies) <- genres
+for (g in 1:10){
+  content.movies[g,1] <- random.movies[g,1] 
+  qq <- unlist(strsplit(random.movies[g,]$genres,split="[|]"))
+    for (k in 1:length(qq)){
+      content.movies[g,qq[k]] <- as.numeric(1)
+    }
+}
+
+cosine.similarity <- function(x, y) {
+
+  sum(x*y)/(norm(x, type="2") * norm(y, type="2"))
+}
+
+cosine.similarity(as.numeric(uspf),as.numeric(content.movies[1,2:21]))
+
+content.movies <- cbind(content.movies,c(1,1,1,1,1,1,1,1,1,1))
+
+for (h in 1:10){
+  cos <- c(cosine.similarity(as.numeric(uspf),as.numeric(content.movies[h,2:21])))
+  content.movies[h,22] <- cos  
+}
+
+```
+
+```{r}
+library(crayon)
+options(digits=3)
+sorted.out <- content.movies[order(content.movies[,22]),]
+cat("For the User ID 364, the following movies are recommended" , "\n")
+for (r in 10:6){
+  mov <- which(mv_dt$movieId == sorted.out[r,1])
+  cat("Movie" ,(mv_dt[mov,2])  , ",similarity score" , format(round(as.numeric(sorted.out[r,22]),3)), "\n")
+}
+```
+
+
+###2.3 Collaborative Filtering 
+```{r}
+u191lsh <- c(which(res$a == "us191"))
+u191lsh <- c(u191lsh,c(which(res$b == "us191")))
+
+short <- res[u191lsh,]
+tim <- short[order(-short$score),]
+tim
+
+```
+###2.3 (a.) User-User Similarity
+```{r}
+#get the user 191 movies list 
+us191 <- subset(us_dt,us_dt$userId==191)
+row.names(us191) <- 1:length(as.numeric(us191$movieId))
+
+test.set <- head(us191)
+for (i in 1:6){
+  us191[i,3] <- NA
+}
+
+neighbours.191 <- c("513","317","415","64","556") 
+ros <- c("191",neighbours.191)
+user513 <- subset(us_dt,us_dt$userId==513)
+user317 <- subset(us_dt,us_dt$userId==317)
+user415 <-subset(us_dt,us_dt$userId==415)
+user64 <- subset(us_dt,us_dt$userId==64)
+user556 <-subset(us_dt,us_dt$userId==556)
+utility <- matrix(as.numeric(0),nrow = 6,ncol = 27)
+
+mov.list <- intersect(us191$movieId,user513$movieId)
+mov.list <- c(unique(mov.list),intersect(us191$movieId,user317$movieId))
+mov.list <- c(unique(mov.list),intersect(us191$movieId,user415$movieId))
+mov.list <- c(unique(mov.list),intersect(us191$movieId,user64$movieId))
+mov.list <- c(unique(mov.list),intersect(us191$movieId,user556$movieId))
+mov.list <- unique(mov.list)
+mov.list
+```
+
+```{r}
+colnames(utility) <- factor(mov.list) 
+rownames(utility) <- ros  
+  i <- "191"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+  i <- "513"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+  i <- "415"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+  i <- "64"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+  i <- "556"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+  i <- "317"
+  us_id <- subset(us_dt,us_dt$userId==as.numeric(i))
+  for (j in 1:29){
+    w <- colnames(utility)[j]
+    if (is.element(w,us_id$movieId) && !is.null(w) ){
+      cv <- which(us_id$movieId == w)
+      utility[i,w] <- as.numeric(us_id[cv,3])}}
+for (i in 1:5){utility["191",i] <- as.numeric(0)}
+for (t in 1:ncol(utility)) {
+  for (r in 1:nrow(utility)) {
+    if(is.na(utility[r,t]) || utility[r,t] == 0){
+      utility[r,t] <- NA}}}
+meanutil <- utility
+  means <- c(mean(meanutil[1,],na.rm = TRUE))
+for (h in 2:6){
+  means <- c(means,mean(meanutil[h,],na.rm = TRUE))}
+for (t in 1:6){
+  for (j in 1:27){
+    if (!is.na(meanutil[t,j]) ){
+      meanutil[t,j] <- meanutil[t,j] - means[t]}
+    else{
+      meanutil[t,j] <- NA}}}  
+js <- matrix(NA, nrow = 1,ncol = 3)
+colnames(js) <- c("513","317","415")  
+js[1,] <- c(0.4359,0.4033,0.3256)
+moviewq <- c("110","150","161","208","231")
+rate <- matrix(NA,nrow = 1,ncol = 5)
+colnames(rate) <- c("110","150","161","208","231")
+for (m in moviewq){
+  if (!is.na(meanutil["513",m])){
+    ratenum <- sum(0,js[1]*meanutil["513",m])}
+  if(!is.na(meanutil["317",m])){
+    ratenum <- sum(ratenum,js[2]*meanutil["317",m])}
+  if(!is.na(meanutil["415",m])){
+    ratenum <- sum(ratenum,js[3]*meanutil["415",m])}
+  rateden <- 0
+  for(u in 1:3){
+    if(!is.na(meanutil[colnames(js)[u],m]) ){
+      rateden <- sum(rateden,js[u])}
+    else {
+      next}}
+  rateqq <- (ratenum / rateden) + means[1]
+  rate[1,m] <- round(rateqq,0)}
+errornum <- matrix(as.numeric(0),nrow = 5,ncol = 3)
+rownames(errornum) <- c("110","150","161","208","231") 
+colnames(errornum) <- c("p","a","diff")
+us191 <- subset(us_dt,us_dt$userId==191)
+for (y in 1:5){
+  errornum[colnames(rate)[y],"p"] <- rate[1,colnames(rate)[y]]
+  errornum[colnames(rate)[y],"a"] <- as.numeric(us191$rating[which(us191$movieId %in% colnames(rate)[y])])
+  errornum[colnames(rate)[y],"diff"] <- (as.numeric(errornum[y,"p"]) - as.numeric(errornum[y,"a"]))^2 }
+sumee <- 0
+for (h in 1:5){
+sumee <- sumee + as.numeric(errornum[h,"diff"])  }
+rsme <- round((sqrt(sumee) / 5),3)
+errornum
+
+```
+
+```{r}
+cat("UID 191, 5 random user IDs: ", as.numeric(rownames(utility)),"\n")
+cat("Considering user-user similarity, 191 rating would be:", "\n")
+
+for(k in 1:5){
+  cat(rownames(errornum)[k],":", as.numeric(errornum[k,1]),"\n")
+}
+cat("RSME Value is:",rsme,"\n")
+```
+
+###2.3 (b.) Item-Item Similarity
+```{r}
+abc <- t(utility)
+abc["231","191"] <- 2
+meanabc <- apply(abc, 1, function(x) mean(x, na.rm=T))
+uti.abc <- abc
+for(i in 1:nrow(abc)) 
+{for(j in 1:ncol(abc)) 
+  {if(!is.na(abc[i,j]))
+    {abc[i,j] <- abc[i,j] - meanabc[i]} 
+    else
+    {abc[i,j] <- 0 }}}
+errorin2 <- matrix(as.numeric(0),nrow = 4,ncol = 3)
+rownames(errorin2)<- c("110","150","161","208")
+colnames(errorin2) <- c("p","a","diff")
+cosmat <- matrix(NA,nrow = 27,ncol = 1)
+for (h in 1:nrow(abc)){
+  cos <- cosine.similarity(abc[h,],abc[1,])
+  cosmat[h,1] <- round(cos,4)    }
+cosmat[1] <- 0.0000
+abc <- cbind(abc,cosmat)
+maaa <- c(tail(sort(abc[,7])))
+rate.num <- sum(abc["595",7]*abc["595",1] + abc["10",7]*abc["10",1] + abc["34",7]*abc["34",1])
+qwqq <- c("595","10","34")
+rate.den <- 0
+  for(u in 1:3){
+    if(abc[qwqq[u],1] != 0){
+      rate.den <- sum(rate.den,abc[qwqq[u],7])}
+    else {
+      next }}
+  rate.qq <- (rate.num / rate.den) + meanabc[1]
+  errorin2[1,"p"] <- round(rate.qq)
+  errorin2[1,"a"] <-  as.numeric(us191$rating[which(us191$movieId %in% "110")])
+  errorin2[1,"diff"] <- (as.numeric(errorin2[1,"p"]) - as.numeric(errorin2[1,"a"]))^2 
+abc <- abc[,-7]
+cosmat <- matrix(NA,nrow = 27,ncol = 1)
+for (h in 1:nrow(abc)){
+  cos <- cosine.similarity(abc[h,],abc[2,])
+  cosmat[h,1] <- round(cos,4)}
+cosmat[2] <- 0.0000
+abc <- cbind(abc,cosmat)
+maaa <- c(tail(sort(abc[,7])))
+qwqq <- c("165","208","457")
+rate.num <- sum(abc[qwqq[1],7]*abc[qwqq[1],1] + abc[qwqq[2],7]*abc[qwqq[2],1] + abc[qwqq[3],7]*abc[qwqq[3],1])
+  rate.den <- 0
+  for(u in 1:3){
+    if(abc[qwqq[u],1] != 0){
+      rate.den <- sum(rate.den,abc[qwqq[u],7])}
+    else {
+      next}}
+  rate.qq <- (rate.num / rate.den) + meanabc[2]
+  errorin2[2,"p"] <- round(rate.qq)
+  errorin2[2,"a"] <-  as.numeric(us191$rating[which(us191$movieId %in% "150")])
+  errorin2[2,"diff"] <- (as.numeric(errorin2[2,"p"]) - as.numeric(errorin2[2,"a"]))^2 
+abc <- abc[,-7]
+cosmat <- matrix(NA,nrow = 27,ncol = 1)
+for (h in 1:nrow(abc)){
+  cos <- cosine.similarity(abc[h,],abc[3,])
+  cosmat[h,1] <- round(cos,4)    }
+cosmat[3] <- 0.0000
+abc <- cbind(abc,cosmat)
+maaa <- c(tail(sort(abc[,7])))
+qwqq <- c("356","165","150")
+rate.num <- sum(abc[qwqq[1],7]*abc[qwqq[1],1] + abc[qwqq[2],7]*abc[qwqq[2],1] + abc[qwqq[3],7]*abc[qwqq[3],1])
+  rate.den <- 0
+  for(u in 1:3){
+    if(abc[qwqq[u],1] != 0){
+      rate.den <- sum(rate.den,abc[qwqq[u],7])}
+    else {
+      next}}
+  rate.qq <- (rate.num / rate.den) + meanabc[3]
+  errorin2[3,"p"] <- round(rate.qq)
+  errorin2[3,"a"] <-  as.numeric(us191$rating[which(us191$movieId %in% "161")])
+  errorin2[3,"diff"] <- (as.numeric(errorin2[3,"p"]) - as.numeric(errorin2[3,"a"]))^2 
+abc <- abc[,-7]
+cosmat <- matrix(NA,nrow = 27,ncol = 1)
+for (h in 1:nrow(abc)){
+  cos <- cosine.similarity(abc[h,],abc[4,])
+  cosmat[h,1] <- round(cos,4)    }
+cosmat[5] <- 0.0000
+cosmat[4] <- 0.0000
+abc <- cbind(abc,cosmat)
+maaa <- c(tail(sort(abc[,7])))
+qwqq <- c("150","165","457")
+rate.num <- sum(abc[qwqq[1],7]*abc[qwqq[1],1] + abc[qwqq[2],7]*abc[qwqq[2],1] + abc[qwqq[3],7]*abc[qwqq[3],1])
+rate.den <- 0
+  for(u in 1:3){
+    if(abc[qwqq[u],1] != 0){
+      rate.den <- sum(rate.den,abc[qwqq[u],7])}
+    else {
+      next}}
+  rate.qq <- (rate.num / rate.den) + meanabc[4]
+  errorin2[4,"p"] <- round(rate.qq)
+  errorin2[4,2] <- us191["208",3]
+  errorin2[4,"a"] <-  as.numeric(us191$rating[which(us191$movieId %in% "208")])
+  errorin2[4,"diff"] <- (as.numeric(errorin2[4,"p"]) - as.numeric(errorin2[4,"a"]))^2 
+abc <- abc[,-7]
+sumeee <- 0
+for (h in 1:4){
+sumeee <- sumeee + as.numeric(errorin2[h,"diff"])  }
+rsmeee <- round((sqrt(sumeee) / 4),3)
+cat("User ID 191, 5 random user IDs:  ", as.numeric(colnames(uti.abc)),"\n")
+cat("Using item-item similarity, User 191 will rate the movies as follows:" , "\n")
+for (i in 1:4){
+  cat(rownames(errorin2)[i],":", as.numeric(errorin2[i,1]),"\n")}
+cat("RSME",":",rsmeee)
+
+```
